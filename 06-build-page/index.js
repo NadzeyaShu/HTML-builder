@@ -4,7 +4,28 @@ const path = require('path');
 let projectDistPath = path.join(__dirname, 'project-dist');
 let indexPath = path.join(projectDistPath, 'index.html');
 
-function createProjectDist() {
+fs.stat(projectDistPath, err => {
+    if (!err) {
+        fs.rm(projectDistPath, {recursive: true}, err1 => {
+            if (err1) throw err1;
+            fs.mkdir(projectDistPath, err1 => {
+                if (err1) throw err1;
+                createIndexPage();
+                mergeStyles();
+                copyDir();
+            })
+        })
+    } else if (err.code === 'ENOENT') {
+        fs.mkdir(projectDistPath, err1 => {
+            if (err1) throw err1;
+            createIndexPage();
+            mergeStyles();
+            copyDir();
+        })
+    }
+})
+
+function createIndexPage() {
 
     let templatePath = path.join(__dirname, 'template.html');
     //read template
@@ -39,49 +60,21 @@ function createProjectDist() {
 
                                 fs.writeFile(indexPath, templateData, err => {
                                     if (err) throw err;
-
-                                    mergeStyles()
-                                    copyDir();
                                 })
                             })
-
                         } else {
                             fs.writeFile(indexPath, templateData, err => {
                                 if (err) throw err;
-
-                                mergeStyles()
-                                copyDir();
                             })
                         }
                     })
-
                 })
             })
         });
     })
 }
 
-fs.stat(projectDistPath, err => {
-    if (!err) {
-        fs.rm(projectDistPath, {recursive: true}, err1 => {
-            if (err1) throw err1;
-            fs.mkdir(projectDistPath, err1 => {
-                createProjectDist();
-            })
-        })
-    } else if (err.code === 'ENOENT') {
-        fs.mkdir(projectDistPath, err1 => {
-            if (err1) throw err1;
-            createProjectDist();
-        })
-
-    }
-})
-
 function mergeStyles() {
-    const fs = require('fs');
-    const path = require('path');
-
     let stylesPath = path.join(__dirname, 'styles');
     let bundlePath = path.join(__dirname, 'project-dist', 'style.css');
 
@@ -119,10 +112,6 @@ function mergeStyles() {
 }
 
 function copyDir() {
-
-    const path = require('path')
-    const fs = require('fs');
-
     let copyFolderPath = path.join(__dirname, 'project-dist', 'assets');
     let sourceFolderPath = path.join(__dirname, 'assets');
 
@@ -155,7 +144,6 @@ function copyDir() {
                                         let destinationFilePath = path.join(copyFolderPth, file.name);
                                         fs.copyFile(sourceFilePath, destinationFilePath, err3 => {
                                             if (err3) throw err3;
-                                            console.log(`copied ${destinationFilePath}`)
                                         })
                                     }
                                 });
