@@ -3,75 +3,48 @@ const path = require('path');
 
 let projectDistPath = path.join(__dirname, 'project-dist');
 let indexPath = path.join(projectDistPath, 'index.html');
+let templatePath = path.join(__dirname, 'template.html');
+let componentsFolderPath = path.join(__dirname, 'components');
 
-fs.stat(projectDistPath, err => {
-    if (!err) {
-        fs.rm(projectDistPath, {recursive: true}, err1 => {
-            if (err1) throw err1;
+buildPage();
+
+function buildPage() {
+    fs.stat(projectDistPath, err => {
+        if (!err) {
+            fs.rm(projectDistPath, {recursive: true}, err1 => {
+                if (err1) throw err1;
+                fs.mkdir(projectDistPath, err1 => {
+                    if (err1) throw err1;
+                    createIndexPage();
+                    mergeStyles();
+                    copyDir();
+                })
+            })
+        } else if (err.code === 'ENOENT') {
             fs.mkdir(projectDistPath, err1 => {
                 if (err1) throw err1;
                 createIndexPage();
                 mergeStyles();
                 copyDir();
             })
-        })
-    } else if (err.code === 'ENOENT') {
-        fs.mkdir(projectDistPath, err1 => {
-            if (err1) throw err1;
-            createIndexPage();
-            mergeStyles();
-            copyDir();
-        })
-    }
-})
-
-function createIndexPage() {
-
-    let templatePath = path.join(__dirname, 'template.html');
-    //read template
-    const readableStream = fs.createReadStream(templatePath, 'utf-8');
-    readableStream.on('data', templateData => {
-        //join components in index.html
-        let articlesFilePath = path.join(__dirname, 'components', 'articles.html');
-        const articlesReadableStream = fs.createReadStream(articlesFilePath, 'utf-8');
-        articlesReadableStream.on('data', articles => {
-            let searchValue = RegExp('{{articles}}', 'gi');
-            templateData = templateData.replace(searchValue, articles);
-
-            let footerFilePath = path.join(__dirname, 'components', 'footer.html');
-            const footerReadableStream = fs.createReadStream(footerFilePath, 'utf-8');
-            footerReadableStream.on('data', footer => {
-                let searchValue = RegExp('{{footer}}', 'gi');
-                templateData = templateData.replace(searchValue, footer);
-
-                let headerFilePath = path.join(__dirname, 'components', 'header.html');
-                const headerReadableStream = fs.createReadStream(headerFilePath, 'utf-8');
-                headerReadableStream.on('data', header => {
-                    let searchValue = RegExp('{{header}}');
-                    templateData = templateData.replace(searchValue, header);
-
-                    let aboutFilePath = path.join(__dirname, 'components', 'about.html');
-                    fs.stat(aboutFilePath, err => {
-                        if (!err) {
-                            const aboutReadableStream = fs.createReadStream(aboutFilePath, 'utf-8');
-                            aboutReadableStream.on('data', about => {
-                                let searchValue = RegExp('{{about}}');
-                                templateData = templateData.replace(searchValue, about);
-
-                                fs.writeFile(indexPath, templateData, err => {
-                                    if (err) throw err;
-                                })
-                            })
-                        } else {
-                            fs.writeFile(indexPath, templateData, err => {
-                                if (err) throw err;
-                            })
-                        }
-                    })
-                })
-            })
-        });
+        }
     })
+}
+
+async function createIndexPage() {
+    let templateHtml = await fs.promises.readFile(templatePath, 'utf-8');
+    let componentsFiles = await fs.promises.readdir(componentsFolderPath);
+
+    for (const componentFile of componentsFiles) {
+        let templateForReplace = `{{${path.parse(componentFile).name}}}`;
+        if (templateHtml.match(templateForReplace)) {
+            let componentFilePath = path.join(__dirname, 'components', componentFile);
+            let componentData = await fs.promises.readFile(componentFilePath, 'utf-8');
+
+            templateHtml = templateHtml.replace(templateForReplace, componentData);
+            await fs.promises.writeFile(indexPath, templateHtml);
+        }
+    }
 }
 
 function mergeStyles() {
