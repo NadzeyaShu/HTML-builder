@@ -17,7 +17,7 @@ function buildPage() {
                     if (err1) throw err1;
                     createIndexPage();
                     mergeStyles();
-                    copyDir();
+                    copyAssets();
                 })
             })
         } else if (err.code === 'ENOENT') {
@@ -25,33 +25,47 @@ function buildPage() {
                 if (err1) throw err1;
                 createIndexPage();
                 mergeStyles();
-                copyDir();
+                copyAssets();
             })
         }
     })
 }
 
 async function createIndexPage() {
-    let templateHtml = await fs.promises.readFile(templatePath, 'utf-8');
-    let componentsFiles = await fs.promises.readdir(componentsFolderPath, {withFileTypes: true});
+    fs.promises.readFile(templatePath, 'utf-8')
+        .then((templateHtml) => {
+            fs.promises.readdir(componentsFolderPath, {withFileTypes: true})
+                .then(async (componentsFiles) => {
+                    for (const componentFile of componentsFiles) {
+                        let fileExt = path.extname(componentFile.name);
+                        let templateForReplace = `{{${path.basename(componentFile.name, fileExt)}}}`;
 
-    for (const componentFile of componentsFiles) {
-        let fileExt = path.extname(componentFile.name);
-        let templateForReplace = `{{${path.basename(componentFile.name, fileExt)}}}`;
+                        if (fileExt === '.html' && templateHtml.match(templateForReplace)) {
+                            let componentFilePath = path.join(__dirname, 'components', componentFile.name);
+                            let componentData = await fs.promises.readFile(componentFilePath, 'utf-8');
 
-        if (fileExt === '.html' && templateHtml.match(templateForReplace)) {
-            let componentFilePath = path.join(__dirname, 'components', componentFile.name);
-            let componentData = await fs.promises.readFile(componentFilePath, 'utf-8');
-
-            templateHtml = templateHtml.replace(templateForReplace, componentData);
-            await fs.promises.writeFile(indexPath, templateHtml);
-        }
-    }
+                            templateHtml = templateHtml.replace(templateForReplace, componentData);
+                            await fs.promises.writeFile(indexPath, templateHtml);
+                        }
+                    }
+                })
+        })
 }
 
-function mergeStyles() {
+async function mergeStyles() {
     let stylesPath = path.join(__dirname, 'styles');
     let bundlePath = path.join(__dirname, 'project-dist', 'style.css');
+
+    fs.stat(bundlePath, err => {
+        if (!err) {
+            fs.rm(bundlePath, err1 => {
+                if (err1) throw err1;
+                addCssToBundle();
+            })
+        } else if (err.code === 'ENOENT') {
+            addCssToBundle();
+        }
+    });
 
     function addCssToBundle() {
         fs.readdir(stylesPath, {withFileTypes: true}, (err, files) => {
@@ -73,22 +87,22 @@ function mergeStyles() {
             });
         });
     }
-
-    fs.stat(bundlePath, err => {
-        if (!err) {
-            fs.rm(bundlePath, err1 => {
-                if (err1) throw err1;
-                addCssToBundle();
-            })
-        } else if (err.code === 'ENOENT') {
-            addCssToBundle();
-        }
-    });
 }
 
-function copyDir() {
+async function copyAssets() {
     let copyFolderPath = path.join(__dirname, 'project-dist', 'assets');
     let sourceFolderPath = path.join(__dirname, 'assets');
+
+    fs.stat(copyFolderPath, err => {
+        if (!err) {
+            fs.rmdir(copyFolderPath, {recursive: true}, err1 => {
+                if (err1) throw err1;
+                createFolderAndCopyFiles();
+            })
+        } else if (err.code === 'ENOENT') {
+            createFolderAndCopyFiles();
+        }
+    });
 
     function createFolderAndCopyFiles() {
         fs.mkdir(copyFolderPath, err1 => {
@@ -129,15 +143,4 @@ function copyDir() {
             })
         })
     }
-
-    fs.stat(copyFolderPath, err => {
-        if (!err) {
-            fs.rmdir(copyFolderPath, {recursive: true}, err1 => {
-                if (err1) throw err1;
-                createFolderAndCopyFiles();
-            })
-        } else if (err.code === 'ENOENT') {
-            createFolderAndCopyFiles();
-        }
-    });
 }
