@@ -33,12 +33,14 @@ function buildPage() {
 
 async function createIndexPage() {
     let templateHtml = await fs.promises.readFile(templatePath, 'utf-8');
-    let componentsFiles = await fs.promises.readdir(componentsFolderPath);
+    let componentsFiles = await fs.promises.readdir(componentsFolderPath, {withFileTypes: true});
 
     for (const componentFile of componentsFiles) {
-        let templateForReplace = `{{${path.parse(componentFile).name}}}`;
-        if (templateHtml.match(templateForReplace)) {
-            let componentFilePath = path.join(__dirname, 'components', componentFile);
+        let fileExt = path.extname(componentFile.name);
+        let templateForReplace = `{{${path.basename(componentFile.name, fileExt)}}}`;
+
+        if (fileExt === '.html' && templateHtml.match(templateForReplace)) {
+            let componentFilePath = path.join(__dirname, 'components', componentFile.name);
             let componentData = await fs.promises.readFile(componentFilePath, 'utf-8');
 
             templateHtml = templateHtml.replace(templateForReplace, componentData);
